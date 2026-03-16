@@ -72,7 +72,7 @@ Dockerfile自体を変更した場合は `make build && make up` が必要。
 | テストパスワード | `TEST_PASSWORD` |
 | RADIUS shared secret | `RADIUS_SECRET` |
 | LDAP admin password | `LDAP_ADMIN_PASSWORD` |
-| LDAP admin DN | `cn=admin,dc=kobedenshi,dc=ac,dc=jp` |
+| LDAP admin DN | `cn=admin,dc=kobedenshi,dc=ac,dc=jp`（Phase 1。kic.ac.jp用は `cn=admin,dc=kic,dc=ac,dc=jp`） |
 
 ## FreeRADIUS設定の注意事項
 
@@ -132,7 +132,7 @@ C  = JP（固定）
 ST = Hyogo（都道府県ローマ字、機関ごとに固定）
 L  = Kobe-shi（市区町村ローマ字、機関ごとに固定）
 O  = 機関名英語表記（サービス参加申請時に登録）
-CN = サーバのFQDN（例: radius.kobedenshi.ac.jp）
+CN = サーバのFQDN（例: radius.kobedenshi.ac.jp, radius.kic.ac.jp）
 ```
 
 ### 証明書発行フロー
@@ -147,9 +147,7 @@ CN = サーバのFQDN（例: radius.kobedenshi.ac.jp）
 詳細は `docs/UPKI/` 配下を参照:
 - `UPKI-eduroam申請資格調査.md` — 申請主体の整理とeduroam JPへの確認事項
 - `国立情報学研究所UPKI電子証明書発行サービス利用規程.md` — 利用規程全文
-- `発行前審査方法.md` — 在籍確認審査・ドメイン審査の手順
-- `支援システム操作手順書_はじめに.md` — 支援システムの概要と参加申請フロー
-- `サーバ証明書管理手順_登録担当者用.md` — 証明書の発行・更新・失効手順
+- `証明書申請・管理ガイド.md` — 参加申請→発行前審査→証明書管理の統合ガイド
 - `サーバ証明書インストールマニュアル_OpenLDAP編.md` — OpenLDAPへの証明書インストール手順
 - `UPKI証明書FAQ要約.md` — eduroam関連のFAQ要約
 

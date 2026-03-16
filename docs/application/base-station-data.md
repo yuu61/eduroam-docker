@@ -34,12 +34,32 @@ A: eduroam databaseでは、機関Web URLは「サービス関連情報ページ
 
 ## 本プロジェクトへの適用メモ
 
-神戸電子専門学校の場合：
+申請主体は学校法人コンピュータ総合学園。2校のキャンパスを基地局（site）として登録する。両校は直線距離で約70mの近接した立地にある。
 
-- **基地局名称（英語）**: Kobe Electronics College (仮)
+### 神戸電子専門学校
+
+- **基地局名称（英語）**: Kobe Institute of Computing - College of Computing
 - **基地局名称（日本語）**: 神戸電子専門学校
-- **基地局緯度・経度**: 要確認（北野坂キャンパス周辺）
-- **基地局所在地（英語）**: Kita-ku, Kobe-shi, Hyogo (仮)
+- **基地局緯度・経度**: 34.699598, 135.193128
+- **基地局所在地（英語）**: Chuo-ku, Kobe-shi, Hyogo
+- **基地局所在地 町名番地（英語）**: 1-1-8 Kitano-cho
 - **SSID**: eduroam
-- **機関Web URL**: https://www.kobedenshi.ac.jp/ (仮)
+- **機関Web URL**: https://www.kobedenshi.ac.jp/
 - **機関ポリシURL**: 運用ポリシページを別途作成する必要あり
+
+### 神戸情報大学院大学
+
+- **基地局名称（英語）**: Kobe Institute of Computing - Graduate School of Information Technology
+- **基地局名称（日本語）**: 神戸情報大学院大学
+- **基地局緯度・経度**: 34.698970, 135.193142
+- **基地局所在地（英語）**: Chuo-ku, Kobe-shi, Hyogo
+- **基地局所在地 町名番地（英語）**: 2-2-7 Kano-cho
+- **SSID**: eduroam
+- **機関Web URL**: https://www.kic.ac.jp/
+- **機関ポリシURL**: 運用ポリシページを別途作成する必要あり
+
+### 備考
+
+- 1つの参加機関の下で複数siteをどう登録するかはNIIへの確認事項
+- 基地局名称の英語表記は各校の公式英語名に準拠（学校法人全体: Kobe Institute of Computing）
+- 緯度・経度は住所からのジオコーディング値。実際の登録時にはキャンパス代表地点をGoogle Maps等で確認して調整すること

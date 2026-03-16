@@ -9,7 +9,7 @@ FreeRADIUS + Google Workspace Secure LDAPによるEAP-TTLS/PAP認証をDockerで
 graph LR
     Device[端末] -->|802.1X/EAP| AP[AP]
     AP -->|RADIUS| FR[FreeRADIUS<br>IdP+SP]
-    FR -->|"@kobedenshi.ac.jp"| GW[Google Workspace<br>Secure LDAP]
+    FR -->|"@kobedenshi.ac.jp<br>@kic.ac.jp"| GW[Google Workspace<br>Secure LDAP]
     FR -->|他大学 realm| FLR[eduroam JP FLR<br>proxy転送]
 ```
 
@@ -62,6 +62,12 @@ cp docker/.env.example docker/.env
 | `make test-eapol` | eapol_testでEAP-TTLS/PAP認証テスト |
 | `make ldap-search` | LDAPユーザー確認 |
 | `make clean` | 全環境クリーンアップ |
+
+## ドキュメント
+
+- [アーキテクチャ設計書](docs/infrastructure/architecture.md) — システム全体像、認証フロー、フェーズ別構成
+- [eduroam JP 申請資格調査](docs/application/eligibility.md) — 参加条件と申請ルートの整理
+- [APベンダー調査](docs/ap/vendor-survey.md) — 6ベンダー比較、eduroam適性ランク、TCO試算
 
 ## 検証フェーズ
 
