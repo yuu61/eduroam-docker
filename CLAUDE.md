@@ -31,6 +31,9 @@ docker/                         # Docker環境
   test-client/                  # radtest/eapol_testクライアント
 scripts/                        # セットアップ・証明書生成スクリプト
 docs/                           # 技術ドキュメント
+  application/                  # eduroam JP 申請手続き
+  infrastructure/               # インフラ・技術設計
+  ap/                           # アクセスポイント調査
   UPKI/                         # NII UPKI証明書関連ドキュメント
 plans/                          # 実装計画
 ```
