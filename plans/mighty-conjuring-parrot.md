@@ -2,7 +2,7 @@
 
 ## Context
 
-神戸電子専門学校（kobedenshi.ac.jp）にeduroamを導入するため、FreeRADIUS + Google Workspace Secure LDAP による検証環境をDockerで構築する。IT部門への提案に必要な技術的裏付けを得ることが目的。
+学校法人コンピュータ総合学園（神戸電子専門学校・神戸情報大学院大学）にeduroamを導入するため、FreeRADIUS + Google Workspace Secure LDAP による検証環境をDockerで構築する。IT部門への提案に必要な技術的裏付けを得ることが目的。
 
 ## 認証方式の決定: EAP-TTLS/PAP
 

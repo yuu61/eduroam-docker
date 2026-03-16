@@ -1,18 +1,16 @@
 # eduroam技術検証環境
 
-神戸電子専門学校（kobedenshi.ac.jp）へのeduroam導入に向けた技術検証環境。
+学校法人コンピュータ総合学園（神戸電子専門学校・神戸情報大学院大学）へのeduroam導入に向けた技術検証環境。
 FreeRADIUS + Google Workspace Secure LDAPによるEAP-TTLS/PAP認証をDockerで構築する。
 
 ## アーキテクチャ
 
-```
-[端末] → 802.1X/EAP → [AP] → RADIUS → [FreeRADIUS (IdP+SP)]
-                                              │
-                         ┌──────────────────────┤
-                         ↓                      ↓
-              @kobedenshi.ac.jp          他大学realm
-              Google Workspace           eduroam JP FLR
-              Secure LDAP (認証)         (proxy転送)
+```mermaid
+graph LR
+    Device[端末] -->|802.1X/EAP| AP[AP]
+    AP -->|RADIUS| FR[FreeRADIUS<br>IdP+SP]
+    FR -->|"@kobedenshi.ac.jp"| GW[Google Workspace<br>Secure LDAP]
+    FR -->|他大学 realm| FLR[eduroam JP FLR<br>proxy転送]
 ```
 
 ## 認証方式

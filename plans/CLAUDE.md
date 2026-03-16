@@ -2,7 +2,7 @@
 
 ## プロジェクト概要
 
-神戸電子専門学校（kobedenshi.ac.jp）へのeduroam導入に向けた技術検証環境。
+学校法人コンピュータ総合学園（神戸電子専門学校・神戸情報大学院大学）へのeduroam導入に向けた技術検証環境。
 FreeRADIUS + Google Workspace Secure LDAP による EAP-TTLS/PAP 認証を Docker で構築する。
 
 ## 技術スタック
