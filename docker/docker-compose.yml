@@ -1,0 +1,71 @@
+services:
+  freeradius:
+    build:
+      context: ./freeradius
+    container_name: eduroam-radius
+    ports:
+      - "1812:1812/udp"
+      - "1813:1813/udp"
+    environment:
+      LDAP_ADMIN_PASSWORD: "${LDAP_ADMIN_PASSWORD}"
+      RADIUS_SECRET: "${RADIUS_SECRET}"
+    volumes:
+      # 個別設定ファイルをマウント（開発時の即時反映用）
+      - ./freeradius/raddb/clients.conf:/etc/raddb/clients.conf:ro
+      - ./freeradius/raddb/proxy.conf:/etc/raddb/proxy.conf:ro
+      - ./freeradius/raddb/mods-available/eap:/etc/raddb/mods-available/eap:ro
+      - ./freeradius/raddb/mods-available/ldap:/etc/raddb/mods-available/ldap:ro
+      - ./freeradius/raddb/sites-available/eduroam:/etc/raddb/sites-available/eduroam:ro
+      - ./freeradius/raddb/sites-available/eduroam-inner-tunnel:/etc/raddb/sites-available/eduroam-inner-tunnel:ro
+      # 証明書ディレクトリ
+      - ./freeradius/raddb/certs:/etc/raddb/certs:ro
+    depends_on:
+      openldap:
+        condition: service_healthy
+    networks:
+      - eduroam-net
+    # デバッグモード: -X で詳細ログ出力
+    command: ["radiusd", "-f", "-l", "stdout", "-X"]
+
+  openldap:
+    image: osixia/openldap:1.5.0
+    container_name: eduroam-ldap
+    environment:
+      LDAP_ORGANISATION: "Kobe Denshi"
+      LDAP_DOMAIN: "kobedenshi.ac.jp"
+      LDAP_ADMIN_PASSWORD: "${LDAP_ADMIN_PASSWORD}"
+      LDAP_TLS: "false"
+    volumes:
+      - ./openldap/ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom
+      - ldap-data:/var/lib/ldap
+      - ldap-config:/etc/ldap/slapd.d
+    ports:
+      - "389:389"
+    command: ["--copy-service"]
+    healthcheck:
+      test: ["CMD", "ldapsearch", "-x", "-H", "ldap://localhost", "-b", "", "-s", "base"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - eduroam-net
+
+  test-client:
+    build:
+      context: ./test-client
+    container_name: eduroam-test
+    volumes:
+      - ./test-client/scripts:/scripts:ro
+    depends_on:
+      - freeradius
+    networks:
+      - eduroam-net
+    command: ["sleep", "infinity"]
+
+volumes:
+  ldap-data:
+  ldap-config:
+
+networks:
+  eduroam-net:
+    driver: bridge

@@ -1,0 +1,57 @@
+# eduroam 外部サーバー（EAPトンネル処理）
+server eduroam {
+    listen {
+        type = auth
+        ipaddr = *
+        port = 1812
+    }
+
+    listen {
+        type = acct
+        ipaddr = *
+        port = 1813
+    }
+
+    authorize {
+        # ログ
+        linelog
+
+        # User-Nameからrealmを分離
+        suffix
+
+        # EAP処理
+        eap {
+            ok = return
+        }
+    }
+
+    authenticate {
+        eap
+    }
+
+    preacct {
+        suffix
+    }
+
+    accounting {
+    }
+
+    post-auth {
+        # 外部Identity属性のフィルタリング（eduroamセキュリティ要件）
+        update outer.session-state {
+        }
+
+        Post-Auth-Type REJECT {
+            attr_filter.access_reject
+        }
+    }
+
+    pre-proxy {
+        # proxy前に内部属性を除去
+        attr_filter.pre-proxy
+    }
+
+    post-proxy {
+        eap
+    }
+}

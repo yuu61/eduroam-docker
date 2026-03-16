@@ -1,0 +1,38 @@
+dn: uid=testuser1,ou=people,dc=kobedenshi,dc=ac,dc=jp
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: testuser1
+sn: Test
+givenName: User1
+cn: Test User1
+displayName: Test User1
+uidNumber: 10001
+gidNumber: 10000
+userPassword: changeme-test-pass
+loginShell: /bin/bash
+homeDirectory: /home/testuser1
+mail: testuser1@kobedenshi.ac.jp
+
+dn: uid=testuser2,ou=people,dc=kobedenshi,dc=ac,dc=jp
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: testuser2
+sn: Test
+givenName: User2
+cn: Test User2
+displayName: Test User2
+uidNumber: 10002
+gidNumber: 10000
+userPassword: changeme-test-pass2
+loginShell: /bin/bash
+homeDirectory: /home/testuser2
+mail: testuser2@kobedenshi.ac.jp
+
+dn: cn=eduroam-users,ou=groups,dc=kobedenshi,dc=ac,dc=jp
+objectClass: posixGroup
+cn: eduroam-users
+gidNumber: 10000
+memberUid: testuser1
+memberUid: testuser2

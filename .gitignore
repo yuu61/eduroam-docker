@@ -1,0 +1,27 @@
+# Secrets
+docker/.env
+docker/freeradius/raddb/certs/*.pem
+docker/freeradius/raddb/certs/*.key
+docker/freeradius/raddb/certs/*.crt
+docker/freeradius/raddb/certs/*.csr
+docker/freeradius/raddb/certs/*.p12
+docker/freeradius/raddb/certs/*.der
+docker/freeradius/raddb/certs/serial*
+docker/freeradius/raddb/certs/*.srl
+docker/freeradius/raddb/certs/index.*
+docker/freeradius/raddb/certs/dh
+secrets/
+
+# Docker
+docker/freeradius/raddb/certs/*.cnf
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+*.swp
+*.swo
+*~
+.vscode/
+.idea/

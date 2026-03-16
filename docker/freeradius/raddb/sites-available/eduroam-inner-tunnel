@@ -1,0 +1,46 @@
+# eduroam 内部トンネルサーバー（実際の認証処理）
+# EAP-TTLSの内部でPAP認証を行う
+server eduroam-inner-tunnel {
+    listen {
+        type = auth
+        ipaddr = 127.0.0.1
+        port = 18120
+    }
+
+    authorize {
+        # User-Nameからrealmを分離
+        suffix
+
+        # 自realm以外は拒否（IdPとして自機関のみ認証）
+        if (&Stripped-User-Realm && &Stripped-User-Realm != "kobedenshi.ac.jp") {
+            reject
+        }
+
+        # LDAP検索でユーザーを確認し、パスワードを取得
+        # Phase 1: OpenLDAP（パスワード取得 → PAP比較）
+        ldap
+        # Phase 2: Google Workspace（LDAP bind認証に切替）
+        # ldap_google
+
+        # PAP認証の準備（LDAPから取得したパスワードと比較）
+        pap
+    }
+
+    authenticate {
+        # PAP: LDAPから取得したパスワードと比較
+        Auth-Type PAP {
+            pap
+        }
+
+        # Phase 2用: LDAP bind認証（Google Workspace）
+        # Auth-Type ldap {
+        #     ldap_google
+        # }
+    }
+
+    post-auth {
+        Post-Auth-Type REJECT {
+            attr_filter.access_reject
+        }
+    }
+}

@@ -1,0 +1,49 @@
+# ローカルテスト用 OpenLDAP モジュール (Phase 1)
+ldap {
+    server = "openldap"
+    port = 389
+    identity = "cn=admin,dc=kobedenshi,dc=ac,dc=jp"
+    password = $ENV{LDAP_ADMIN_PASSWORD}
+    base_dn = "dc=kobedenshi,dc=ac,dc=jp"
+
+    sasl {
+    }
+
+    update {
+        control:Password-With-Header += 'userPassword'
+    }
+
+    user {
+        base_dn = "ou=people,${..base_dn}"
+        filter = "(mail=%{%{Stripped-User-Name}:-%{User-Name}})"
+    }
+
+    group {
+        base_dn = "ou=groups,${..base_dn}"
+        filter = "(objectClass=posixGroup)"
+        membership_attribute = "memberUid"
+    }
+
+    options {
+        chase_referrals = yes
+        rebind = yes
+        res_timeout = 10
+        srv_timelimit = 3
+        net_timeout = 1
+        idle = 60
+        probes = 3
+        interval = 3
+        ldap_debug = 0x0028
+    }
+
+    pool {
+        start = 5
+        min = 3
+        max = 32
+        spare = 10
+        uses = 0
+        retry_delay = 30
+        lifetime = 0
+        idle_timeout = 60
+    }
+}

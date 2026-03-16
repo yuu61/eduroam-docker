@@ -1,0 +1,7 @@
+dn: ou=people,dc=kobedenshi,dc=ac,dc=jp
+objectClass: organizationalUnit
+ou: people
+
+dn: ou=groups,dc=kobedenshi,dc=ac,dc=jp
+objectClass: organizationalUnit
+ou: groups

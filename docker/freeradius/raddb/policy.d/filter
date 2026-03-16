@@ -1,0 +1,11 @@
+# eduroam属性フィルタリングポリシー
+# proxy時に不要な属性を除去
+
+policy filter_username {
+    if (&User-Name =~ /@/) {
+        update request {
+            &Stripped-User-Name := "%{User-Name}"
+            &Stripped-User-Realm := ""
+        }
+    }
+}
