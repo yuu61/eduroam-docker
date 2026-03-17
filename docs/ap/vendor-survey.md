@@ -15,6 +15,7 @@ eduroam導入に向けた無線LANアクセスポイントの技術調査。
 | WPA3-Enterprise | 対応 | 対応 | 対応 | 対応（Wi-Fi 6+） | 対応 | 対応（Wi-Fi 6世代） |
 | EAP-TTLS/PAP | 動作する（パススルー） | 動作する（パススルー） | 動作する（パススルー） | 動作する（パススルー） | 動作する | 動作する |
 | 802.11k/v/r | 全対応（SSID毎制御可） | 全対応（ClientMatch独自技術あり） | 全対応（k/vデフォルト有効） | 全対応（r は独自実装） | Wi-Fi 6世代で対応 | Wi-Fi 6世代で対応 |
+| OKC/FTデフォルト有効 | **OKC+FT(Adaptive)** | OKCのみ（FT手動） | **FT有効**（OKC手動） | いずれも手動 | 不明 | 不明 |
 | Dynamic VLAN | 完全対応 | 完全対応（VSAあり） | 完全対応 | 対応 | 記載なし | 記載なし |
 | Passpoint/HS2.0 | 対応（OpenRoaming含む） | 対応（OpenRoaming含む） | 対応（OpenRoaming含む） | 対応（v8.4+） | 未対応 | 未対応 |
 | FreeRADIUS連携 | 公式サポート | 実績多数 | 実績あり | 実績多数 | 標準RADIUSでOK | 技術的に問題なし |
@@ -619,7 +620,158 @@ WLCとは異なるが、AP間で自律的に管理機能を分担する方式。
 
 ---
 
-## コスト比較（AP 30台・5年運用想定）
+## WLC側のRADIUS再認証削減機能
+
+Google Workspace Secure LDAP をバックエンドに使用する場合、LDAP クォータ制限（bind 4 QPS/顧客）が存在する。
+WLC 側の高速ローミング・キャッシュ機能を活用することで、RADIUS 再認証（= Google LDAP へのクエリ）を大幅に削減できる。
+
+詳細な試算は [Google Secure LDAP 技術調査](../infrastructure/google-secure-ldap-802.1x-feasibility.md) を参照。
+
+### 高速ローミング技術の概要
+
+| 技術 | 標準規格 | 仕組み | RADIUS再認証 | クライアント対応 |
+|------|---------|--------|-------------|----------------|
+| **PMKSA Caching** | IEEE 802.11i | 以前接続した AP の PMK をキャッシュし再接続時に再利用 | **スキップ**（同一APのみ） | ほぼ全端末 |
+| **OKC** | 非標準（デファクト） | WLC が PMK を管理下の全 AP に配布。未訪問 AP でも 4-way handshake のみ | **スキップ** | Windows、一部Android。**iOS非対応** |
+| **802.11r（FT）** | IEEE 802.11r | PMK-R0→R1→PTK の3層鍵階層。4フレーム交換のみでローミング | **スキップ** | iOS、Android、Windows（新しめ） |
+| **802.11k** | IEEE 802.11k | AP がネイバーリストを提供、スキャン時間短縮 | 関与しない | 広く対応 |
+| **802.11v（BSS-TM）** | IEEE 802.11v | AP が最適なローミング先を勧告 | 関与しない | 広く対応 |
+
+> **ポイント**: OKC と 802.11r が有効な環境では、初回認証時のみ RADIUS → Google LDAP クエリが発生し、AP 間ローミング時の再認証は**完全にスキップ**される。
+
+### ベンダー別の高速ローミング対応（デフォルト設定）
+
+#### Cisco Catalyst 9800
+
+| 機能 | 対応 | デフォルト | 備考 |
+|------|------|-----------|------|
+| PMKSA Caching（SKC） | 非推奨 | 無効 | Catalyst 9800 では deprecated |
+| **OKC** | **対応** | **有効** | 初回 EAP 後、全 AP で 4-way handshake のみ。FT/CCKM 有効化時は自動無効 |
+| **802.11r（FT）** | **対応** | **有効（Adaptive）** | Over-the-Air / Over-the-DS 両対応。Adaptive でレガシー端末との互換性維持 |
+| 802.11k | 対応 | 有効 | ネイバーリスト提供 |
+| 802.11v（BSS-TM） | 対応 | 有効 | 負荷分散 |
+| Session-Timeout | 設定可 | 1800秒（旧）/ 43200秒（新） | **推奨: 86400秒（1日）**。0 は非推奨（ローミング不具合の原因） |
+
+**評価**: OKC + 802.11r Adaptive がデフォルト有効で、**追加設定なしで RADIUS 再認証がローミング時にスキップ**される。最も手厚い実装。
+
+#### Cisco Meraki
+
+| 機能 | 対応 | デフォルト | 備考 |
+|------|------|-----------|------|
+| PMKSA Caching | **対応** | **有効** | 全 AP で自動有効 |
+| **OKC** | **対応** | **有効** | 全 AP で自動有効。Windows・一部 Android が対応 |
+| **802.11r（FT）** | **対応** | **無効** | `Configure > Access control` から手動有効化。NAT mode / L3 roaming では利用不可 |
+| Adaptive 802.11r | 対応 | — | WPA2 のみ。WPA3 では自動 Enabled |
+| 802.11k | 対応 | 有効 | ネイバーリスト |
+| 802.11v（BSS-TM） | 対応 | **有効**（MR29.1+） | 負荷ベースの AP 推奨 |
+
+**注意**: CoA（Change of Authorization）有効時は高速ローミングが無効化される制約があったが、MR32.1.x + ISE 3.3 Patch 5 以降で共存可能に。
+
+**評価**: OKC デフォルト有効で OKC 対応端末は再認証スキップ可能。802.11r は手動有効化が必要。
+
+#### Aruba（HPE Aruba Networking）
+
+| 機能 | 対応 | デフォルト | 備考 |
+|------|------|-----------|------|
+| PMKSA Caching | **対応** | 有効 | 標準 PMK キャッシュ |
+| OKC | **対応** | **無効** | 手動有効化が必要。KMS が PMK を管理下 AP に配布 |
+| **802.11r（FT）** | **対応** | **有効** | MDID（Mobility Domain ID）の設定を推奨 |
+| 802.11k | 対応 | 推奨（有効化） | 802.11r と併用推奨 |
+| ClientMatch | 対応 | 有効 | Aruba独自のクライアント誘導技術 |
+
+**評価**: 802.11r デフォルト有効で、**追加設定なしで RADIUS 再認証スキップ**。MDID を適切に設定することで大規模キャンパスでの高速ローミングを最適化。
+
+#### Juniper Mist
+
+| 機能 | 対応 | デフォルト | 備考 |
+|------|------|-----------|------|
+| PMKSA Caching | **対応** | **ローカルのみ** | AP 間の PMK 共有なし。同一 AP への再接続時のみ |
+| OKC | **対応** | **無効** | 手動有効化。クラウド経由で隣接 AP に PMKID 配布。**iOS 非対応** |
+| 802.11r（FT） | **対応** | **無効** | Security セクションから手動有効化 |
+| FT Over-the-DS | 対応 | 無効 | Zebra 端末等の互換性オプション |
+
+**制約**:
+- WPA2 では OKC 選択不可（Default / .11r のみ）。WPA3 では Default / OKC / .11r から選択可
+- 設定変更時に AP 無線がリセットされ、接続中のクライアントが一時切断
+
+**評価**: **デフォルトではローカル PMKSA キャッシュのみ**で AP 間ローミング時に完全再認証が発生。クォータ削減には手動設定が必須。
+
+#### Ubiquiti UniFi
+
+| 機能 | 対応 | デフォルト | 備考 |
+|------|------|-----------|------|
+| PMKSA Caching | **対応** | 有効 | 標準 PMK キャッシュ |
+| OKC | 不明 | — | 明示的な OKC 対応の記載なし |
+| Fast Roaming（独自） | **対応** | 有効化可 | 802.11r ベースの Ubiquiti 独自実装。約90%のローミング改善 |
+| 802.11k/v | 対応 | 設定で有効化 | — |
+
+**評価**: 独自 Fast Roaming で実用的なローミング改善は可能だが、OKC 対応が不明確。エンタープライズ向け WLC ほどの細かい制御はできない。
+
+#### YAMAHA WLX / Buffalo AirStation Pro
+
+| 機能 | YAMAHA WLX | Buffalo AirStation Pro |
+|------|-----------|----------------------|
+| PMKSA Caching | Wi-Fi 6世代で対応 | Wi-Fi 6世代で対応 |
+| OKC | 不明（記載なし） | 不明（記載なし） |
+| 802.11r | Wi-Fi 6世代で対応 | Wi-Fi 6世代で対応 |
+| WLC による鍵配布 | 非対応（クラスター管理は簡易的） | 非対応（WLC機能なし） |
+
+**評価**: 802.11r 対応はあるが、WLC による集中的な鍵管理がないため、OKC のような AP 間 PMK 共有は期待できない。ローミング時の RADIUS 再認証スキップは 802.11r 対応端末に限定される。
+
+### ベンダー比較サマリ（RADIUS 再認証削減の観点）
+
+| 機能 | Catalyst 9800 | Meraki | Aruba | Juniper Mist | UniFi | YAMAHA | Buffalo |
+|------|:------------:|:------:|:-----:|:------------:|:-----:|:------:|:-------:|
+| OKC デフォルト有効 | **有** | **有** | 無 | 無 | 不明 | 不明 | 不明 |
+| 802.11r デフォルト有効 | **有（Adaptive）** | 無 | **有** | 無 | 無 | — | — |
+| 追加設定なしで再認証スキップ | **可** | **可**（OKC端末のみ） | **可** | **不可** | 限定的 | 限定的 | 限定的 |
+| Session-Timeout 延長 | **推奨86400秒** | RADIUS依存 | 設定可 | 設定可 | 設定可 | 設定可 | 設定可 |
+
+### Google Secure LDAP クォータとの関係
+
+WLC 側の高速ローミング機能と FreeRADIUS 側の `cache_auth` を組み合わせた場合:
+
+| レイヤー | 対策 | 削減対象 | 効果 |
+|---------|------|---------|------|
+| **WLC** | OKC / 802.11r | AP 間ローミング時の RADIUS 再認証 | Google LDAP クエリ = **0** |
+| **WLC** | Session-Timeout 延長 | 定期再認証の頻度 | 3600秒→86400秒で **24分の1** |
+| **FreeRADIUS** | cache_auth_accept | Session-Timeout 満了時の再認証 | キャッシュヒット時の Google LDAP クエリ = **0** |
+| **FreeRADIUS** | cache_ldap_user_dn | ユーザー DN 検索 | search クエリを削減（bind のみ） |
+
+> **結論**: Cisco Catalyst 9800 または Aruba であれば、デフォルト設定で OKC/802.11r による再認証スキップが機能し、FreeRADIUS の cache_auth と併用することで Google Secure LDAP の 4 QPS 制限は実運用上問題にならない。Juniper Mist は手動設定が必須、YAMAHA/Buffalo は WLC 機能の制約から効果が限定的。
+
+### 参考資料（ローミング・高速ローミング）
+
+- [Catalyst 9800: A Primer on Enterprise WLAN Roaming - Cisco](https://www.cisco.com/c/en/us/products/collateral/wireless/catalyst-9800-series-wireless-controllers/cat9800-ser-primer-enterprise-wlan-guide.html)
+- [Understand 802.11r/11k/11v Fast Roams on 9800 WLCs - Cisco](https://www.cisco.com/c/en/us/support/docs/wireless/catalyst-9800-series-wireless-controllers/221671-understand-802-11r-11k-11v-fast-roams-on.html)
+- [OKC on Catalyst 9800 - Cisco](https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/17-6/config-guide/b_wl_17_6_cg/m_okc.html)
+- [Roaming Technologies - Cisco Meraki](https://documentation.meraki.com/Wireless/Design_and_Configure/Architecture_and_Best_Practices/Roaming_Technologies)
+- [Configuring Support for 802.11r and OKC - Aruba](https://arubanetworking.hpe.com/techdocs/Instant_810_WebHelp/Content/instant-ug/wlan-ssid-conf/conf-fast-roam.htm)
+- [RSSI, Roaming, and Fast Roaming - Juniper Mist](https://www.juniper.net/documentation/us/en/software/mist/mist-wireless/topics/topic-map/rssi-fast-roaming.html)
+- [Session-Timeout, RADIUS and PMK caching - Cisco Community](https://community.cisco.com/t5/wireless/session-timeout-radius-and-pmk-caching/td-p/2983309)
+
+---
+
+## コスト比較（AP 30台想定）
+
+### イニシャルコスト（初期導入費用）
+
+導入時に発生する一括費用の概算。1 USD ≈ 150円換算。
+
+| 項目 | Cisco Catalyst (C9120+EWC) | Aruba (AP-500+7205, AOS 8) | Juniper Mist (AP34) | UniFi (U7 Pro) | YAMAHA (WLX322) | Buffalo (WAPM-AX4R) |
+|------|---------------------------|---------------------------|--------------------|-----------------|-----------------|--------------------|
+| AP本体（30台） | 360〜540万円 | 270〜360万円 | 360〜540万円 | **約85万円** | 約310万円 | 約171万円 |
+| WLC/管理基盤 | 0円（EWC内蔵） 〜105万円（9800-L） | 約100万円（7205） | 0円（クラウド管理） | 0円（セルフホスト） | 0円（クラスター管理） | 別売SW（WLS-ADT） |
+| 必須ライセンス | 68〜135万円（DNA Essentials 3年） | 0円（AOS 8構成時） | 68〜135万円（Wi-Fi Assurance初年） | **0円** | 0円 | 0円 |
+| **イニシャル合計** | **約430〜780万円** | **約370〜460万円** | **約430〜675万円** | **約85万円** | **約310万円** | **約175万円** |
+
+- **最安**: Ubiquiti（約85万円）— 桁違いに安いが、サポート体制が弱い
+- **国産最安**: Buffalo（約175万円）— eduroam実績なし、WLC機能なし
+- **コスパ良**: YAMAHA（約310万円）— eduroam実績なし、クラスター管理で簡易的
+- **実績重視**: Aruba AOS 8構成（約370〜460万円）— サブスクなしでオンプレ完結、eduroam実績最多級
+- **最も高機能**: Cisco（約430〜780万円）— DNAサブスクリプション必須でコスト高
+
+### 5年運用TCO（AP＋ライセンス）
 
 | 項目 | Cisco (C9120+EWC) | Aruba (AP-635+Central) | Juniper (AP34+Mist) | UniFi (U7 Pro) | YAMAHA (WLX322) | Buffalo (WAPM-AX4R) |
 |------|-------------------|----------------------|--------------------|-----------------|-----------------|--------------------|
@@ -629,7 +781,7 @@ WLCとは異なるが、AP間で自律的に管理機能を分担する方式。
 | 設計・導入 | 要見積 | 要見積 | 要見積 | 自前可 | 自前可 | 自前可 |
 | **AP+ライセンス合計** | **$28,500-45,000** | **約500-685万円** | **$46,500-81,000** | **$5,670** | **約310万円** | **約171万円** |
 
-※ 為替レート・代理店割引・教育機関向け割引により大幅に変動。正確な価格は見積もりが必要。
+※ 為替レート・代理店割引・教育機関向け割引により大幅に変動。正確な価格は見積もりが必要。設計・導入費（SIer費用）、PoEスイッチ、ケーブリング費用は別途。
 
 ---
 
