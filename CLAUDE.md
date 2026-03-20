@@ -16,24 +16,42 @@ FreeRADIUS + Google Workspace Secure LDAP による EAP-TTLS/PAP 認証を Docke
 
 ```
 docker/                         # Docker環境
+  .env.example                  # 環境変数テンプレート（.envにコピーして使用）
+  docker-compose.yml            # 3サービス構成（freeradius, openldap, test-client）
   freeradius/
     Dockerfile                  # ストックFreeRADIUSにカスタム設定を上書き
     raddb/
       clients.conf              # RADIUSクライアント定義
       proxy.conf                # realm routing設定
+      policy.d/filter           # ポリシーフィルタ定義
       mods-available/eap        # EAP-TTLS/PAP設定
       mods-available/ldap       # OpenLDAP接続（Phase 1）
       mods-available/ldap_google # Google Workspace LDAP（Phase 2、未有効化）
       sites-available/eduroam            # 外部EAPトンネル
       sites-available/eduroam-inner-tunnel # 内部認証（LDAP検索→PAP）
-      certs/                    # TLS証明書（git-ignored）
-  openldap/ldif/                # テストユーザーデータ
-  test-client/                  # radtest/eapol_testクライアント
+      certs/                    # TLS証明書（git-ignored、generate-certs.shで生成）
+  openldap/ldif/                # LDAPスキーマ・テストユーザーデータ
+  test-client/
+    Dockerfile                  # radtest/eapol_testクライアント
+    scripts/
+      eapol_test.conf           # EAP-TTLS/PAP テスト設定
+      test-all.sh               # 全テスト自動実行スクリプト
 scripts/                        # セットアップ・証明書生成スクリプト
+  setup.sh                      # 初期セットアップ（.env作成 + 証明書生成 + ビルド）
+  generate-certs.sh             # 自己署名CA・サーバ証明書生成
 docs/                           # 技術ドキュメント
   application/                  # eduroam JP 申請手続き
   infrastructure/               # インフラ・技術設計
+    architecture.md             # システム構成設計
+    deployment-strategy.md      # 拠点別展開戦略（財務分析・L8リスク含む）
+    freeradius3-setup.md        # FreeRADIUS設定リファレンス
+    google-secure-ldap-802.1x-feasibility.md  # Google LDAP実現性調査
+    virtualization-comparison.md # 仮想化基盤比較
   ap/                           # アクセスポイント調査
+    existing-ap-survey.md       # 既存AP棚卸し調査結果
+    vendor-survey.md            # ベンダー比較概要
+    vendors/                    # ベンダー別詳細評価
+      aruba-hpe.md / cisco-catalyst-meraki.md / juniper-mist.md / ubiquiti-unifi.md
   UPKI/                         # NII UPKI証明書関連ドキュメント
 plans/                          # 実装計画
 ```
@@ -41,15 +59,19 @@ plans/                          # 実装計画
 ## よく使うコマンド
 
 ```bash
-make setup          # 初期セットアップ（証明書生成 + Dockerビルド）
+make setup          # 初期セットアップ（.env作成 + 証明書生成 + Dockerビルド）
+make certs          # 証明書生成のみ
 make build          # Dockerイメージ再ビルド
 make up             # 環境起動（バックグラウンド）
 make up-debug       # 環境起動（フォアグラウンド、ログ表示）
 make down           # 環境停止
+make restart        # 環境再起動（設定変更の反映に使用）
 make logs           # FreeRADIUSログ表示
+make logs-all       # 全サービスログ表示
+make test           # デフォルトテスト（= test-radtest）
 make test-radtest   # radtestでPAP認証テスト
 make test-eapol     # eapol_testでEAP-TTLS/PAP認証テスト
-make test-all       # 全テスト一括実行
+make test-all       # 全テスト一括実行（test-all.sh経由）
 make ldap-search    # OpenLDAPのユーザー確認
 make clean          # 環境+ボリューム削除
 make clean-certs    # 証明書削除
@@ -66,13 +88,19 @@ Dockerfile自体を変更した場合は `make build && make up` が必要。
 
 `docker/.env` で管理。`docker/.env.example` をコピーして値を設定する。
 
-| 項目 | 環境変数 |
-|------|---------|
-| テストユーザー | `TEST_USER` |
-| テストパスワード | `TEST_PASSWORD` |
-| RADIUS shared secret | `RADIUS_SECRET` |
-| LDAP admin password | `LDAP_ADMIN_PASSWORD` |
-| LDAP admin DN | `cn=admin,dc=kobedenshi,dc=ac,dc=jp`（Phase 1。kic.ac.jp用は `cn=admin,dc=kic,dc=ac,dc=jp`） |
+| 項目 | 環境変数 | 備考 |
+|------|---------|------|
+| RADIUS shared secret | `RADIUS_SECRET` | |
+| LDAP組織名 | `LDAP_ORGANISATION` | `Kobe Denshi` |
+| LDAPドメイン | `LDAP_DOMAIN` | `kobedenshi.ac.jp` |
+| LDAP admin password | `LDAP_ADMIN_PASSWORD` | |
+| LDAP Base DN | `LDAP_BASE_DN` | `dc=kobedenshi,dc=ac,dc=jp` |
+| テストユーザー | `TEST_USER` | |
+| テストパスワード | `TEST_PASSWORD` | |
+
+Phase 2以降で追加される環境変数（`.env.example`にコメントアウトで記載済み）:
+- **Phase 2**: `GOOGLE_LDAP_CERT_FILE`, `GOOGLE_LDAP_KEY_FILE`, `GOOGLE_LDAP_USER`, `GOOGLE_LDAP_PASS`
+- **Phase 4**: `FLR_SERVER_1`, `FLR_SERVER_2`, `FLR_SECRET`
 
 ## FreeRADIUS設定の注意事項
 
