@@ -337,6 +337,3 @@ FortiAuthenticator + Google Workspace Secure LDAP での 802.1X 認証は Fortin
 - [Configuring Support for 802.11r and OKC - Aruba](https://arubanetworking.hpe.com/techdocs/Instant_810_WebHelp/Content/instant-ug/wlan-ssid-conf/conf-fast-roam.htm)
 - [RSSI, Roaming, and Fast Roaming - Juniper Mist](https://www.juniper.net/documentation/us/en/software/mist/mist-wireless/topics/topic-map/rssi-fast-roaming.html)
 
-## 9. 調査日
-
-2026-03-17
