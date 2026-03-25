@@ -236,14 +236,120 @@ CL・R SeriesのDanteポートはRJ45（1000BASE-T）のため、ダークファ
 
 ## eduroamとの関係
 
-オーディオネットワークを物理的に分離することで、eduroam側の設計はオーディオ系を一切考慮する必要がなくなる。
+### Dante音声網
+
+オーディオネットワーク（Dante音声伝送）を物理的に分離することで、eduroam側の設計はオーディオ音声系を一切考慮する必要がなくなる。
 
 | 項目 | 影響 |
 |------|------|
-| eduroam VLAN設計 | **影響なし** — オーディオは別物理網 |
+| eduroam VLAN設計 | **影響なし** — オーディオ音声は別物理網 |
 | AP配置 | ソニックホール・スタジオにもeduroam APは設置可能（インターネット網側） |
 | QoS設計 | eduroam側はオーディオを考慮不要 |
 | 障害切り分け | ネットワーク障害時、オーディオ系とインターネット系を独立して調査可能 |
+
+### オーディオ制御網: ELECOMルーター撤去とeduroamインフラへの統合
+
+#### 3つのネットワークの整理
+
+Dante環境には音声伝送と制御の2つのネットワークがあり、これにインターネット網を加えた3系統を適切に分離・接続する必要がある。
+
+| ネットワーク | 用途 | 接続先 | 要件 |
+|---|---|---|---|
+| **Dante音声網** | CL5 ↔ Rio3224-D2 の音声伝送 | CL5 Danteポート | 物理分離必須、低レイテンシ、インターネット不要 |
+| **オーディオ制御網** | iPad StageMix / PC CL Editor → CL5 | CL5 Networkポート | Wi-Fi必要、mDNS（Bonjour）による機器検出、**インターネットアクセスも必要** |
+| **インターネット網** | eduroam / 学内LAN | — | 通常のインターネットアクセス |
+
+#### 現状の問題
+
+現在、CL5のNetworkポートに家庭用ELECOMルーター（SSID: `elecom2g-2de826`、2.4GHz）が接続され、iPad等からのリモートコントロール用Wi-Fiを提供している。この構成には以下の問題がある:
+
+1. **Wi-Fi切り替えのUX悪化**: 学生がStageMixを使うためにeduroamからELECOMのSSIDに手動で切り替える必要がある
+2. **インターネット不通**: 切り替え先のELECOMネットワークではインターネットに出られない（調べ物、資料参照等が不可）
+3. **iOSの自動切断問題**: iOS/iPadOSはインターネット接続のないWi-Fiを「接続が不安定」と判定し自動的に切断する（キャプティブポータル検出の副作用）。StageMix操作中に突然切断される可能性がある
+4. **管理外デバイスのリスク**: 家庭用ルーターは学内ネットワーク管理の対象外であり、ファームウェア更新やセキュリティ管理がされない
+
+#### 解決策: Audio Control VLANの新設
+
+ELECOMルーターを撤去し、CL5のNetworkポートを学内ネットワークインフラ上の専用VLANに収容する。
+
+```
+[Dante音声網]（物理分離・変更なし）
+  CL5 Danteポート ──有線──> Danteスイッチ ──> Rio3224-D2 ×2
+
+[学内ネットワーク]
+  CL5 Networkポート ──有線──> 学内SW（Audio Control VLAN）
+                                       │
+  eduroam AP（ソニックホール設置）       │
+    ├─ SSID: eduroam      → eduroam VLAN → インターネット
+    └─ SSID: sonic-control → Audio Control VLAN
+                                       │
+                                       ↓
+                                 コアSW / ルーター → インターネット
+```
+
+#### SSID方式の比較
+
+| 方式 | 仕組み | メリット | デメリット |
+|------|--------|---------|-----------|
+| **A. 動的VLAN割当** | eduroam認証時にRADIUSがサウンド学科の学生をAudio Control VLANに割り当て | SSID追加不要、eduroam 1本で完結 | CL5と同一L2になるが、制御用と通常用の切り替えができない。全通信がAudio Control VLAN経由になる |
+| **B. L3ルーティング** | eduroam VLANとAudio Control VLANをL3で接続。iPadからCL5のIPを指定して接続 | SSID・VLAN変更不要、最もシンプル | StageMixの自動検出（mDNS/Bonjour）が**サブネットを越えられない**ため手動IP指定が必要。学生のUXが悪い |
+| **C. 専用SSID** | `sonic-control` 等のSSIDをソニックホール周辺のAPから配信、Audio Control VLANにマッピング | CL5と同一L2でmDNS検出が動く。用途に応じた明示的な切り替え | SSIDが増える（ただしソニックホール周辺のAPのみ） |
+
+#### 推奨: 方式C（専用SSID `sonic-control`）
+
+**方式Cが最も現実的**な理由:
+
+- **StageMixはmDNS（Bonjour）でCL5を自動検出する** → CL5とiPadが同一L2セグメントにいる必要がある → 方式Bでは手動IP設定が必要になりUX悪化
+- 方式Aはサウンド学科の学生の全通信が制御VLANに流れるため、通常利用と制御利用の分離ができない
+- Audio Control VLANにインターネットルーティングを付与することで、**iOSの自動切断問題が解消**
+- SSIDはソニックホール・スタジオ周辺のAPのみで配信すればよく、全館への影響はない
+
+#### AP配信構成
+
+eduroamと同じ物理APから `sonic-control` SSIDを追加配信する。WLC側のAPグループ/RFプロファイルで配信対象APをソニックホール・スタジオ周辺に限定する。
+
+```
+[AP（ソニックホール B1F設置）]
+  ├─ SSID: eduroam         → eduroam VLAN（全APで配信）
+  └─ SSID: sonic-control   → Audio Control VLAN（WLCでこのAPのみに限定配信）
+
+[AP（北野館 3F 教室）]
+  └─ SSID: eduroam         → eduroam VLAN（sonic-controlは配信しない）
+```
+
+- 追加のAP機器は不要 — eduroam導入で設置するAPをそのまま利用
+- WLCの設定のみで配信APを制御でき、SSIDの追加・削除も一括管理可能
+- 5F北野坂スタジオにもAudio Control VLANの需要がある場合、WLC側で配信APを追加するだけで対応可能
+
+#### 学生のワークフロー（改善後）
+
+```
+1. ソニックホールに入る
+2. iPadで sonic-control SSIDに接続（eduroam同様、802.1X認証 or PSK）
+3. StageMixを起動 → CL5が自動検出される（mDNS）
+4. ミキサーを操作しながら、Safariで資料も参照できる（インターネット接続あり）
+5. 作業終了後、eduroamに戻る（または自動的に切り替わる）
+```
+
+#### sonic-control SSIDの認証方式
+
+| 方式 | メリット | デメリット |
+|------|---------|-----------|
+| **WPA2/WPA3-PSK** | 設定が簡単、既存の学内RADIUSに依存しない | パスワード共有による管理の手間、人の入れ替わり時の変更が必要 |
+| **802.1X（eduroam RADIUS連携）** | eduroamと同一の認証基盤、個人認証が可能 | RADIUS側でVLAN割当ルールの追加設定が必要 |
+
+教育現場の運用を考慮すると、初期段階ではPSKで導入し、eduroam基盤が安定した段階で802.1Xに移行するのが現実的。
+
+#### ELECOMルーター撤去の効果
+
+| 項目 | Before（ELECOM） | After（Audio Control VLAN） |
+|------|------|------|
+| Wi-Fi切り替え | 手動で別SSIDに切替、UX悪い | sonic-control SSIDに切替、インターネット併用可 |
+| インターネット | 制御網では不通 | ルーティングにより利用可能 |
+| iOS自動切断 | 発生する | **解消**（インターネット到達性あり） |
+| 機器管理 | 管理外の家庭用ルーター | 学内インフラとして一元管理 |
+| セキュリティ | ファームウェア更新等が放置されるリスク | 学内ポリシーに準拠 |
+| ファームウェア更新 | インターネット不通のため、PCにダウンロード済みファイルをUSB等で持ち込む必要あり | Audio Control VLAN経由でインターネットに到達可能。CL5はNetworkポート経由、Rio3224-D2はDante Firmware Update Manager経由で更新可能 |
 
 ## 未確認事項（要調査）
 
